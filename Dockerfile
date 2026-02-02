@@ -10,24 +10,24 @@ RUN npm install -g pnpm
 # 4. 下載源碼
 RUN git clone --depth 1 https://github.com/openclaw/openclaw.git .
 
-# 5. 安裝依賴
-RUN pnpm install
+# 5. 安裝依賴並編譯
+RUN pnpm install && pnpm run build
 
-# 6. 編譯
-RUN pnpm run build
+# 6. [核心修改] 建立多重設定檔保險
+# 確保程式無論讀哪個路徑都能看到 gateway.mode = local
+RUN echo '{"gateway": {"mode": "local"}}' > .openclawrc && \
+    mkdir -p config && \
+    echo '{"gateway": {"mode": "local"}}' > config/config.json
 
-# 7. [關鍵新增] 直接建立設定檔 (雙重保險)
-# 這樣就算啟動指令漏了參數，程式也能讀到這個檔
-RUN echo '{"gateway": {"mode": "local"}}' > .openclawrc
-
-# 8. 設定環境變數
+# 7. 設定環境變數
 ENV GATEWAY_MODE=local
 ENV PORT=18789
 ENV HOST=0.0.0.0
+ENV NODE_ENV=production
 
-# 9. 開放 Port
+# 8. 開放 Port
 EXPOSE 18789
 
-# 10. 啟動指令
-# 我們已經有 .openclawrc 了，但參數還是帶著比較保險
+# 9. [關鍵啟動指令] 
+# 我們直接執行編譯後的 JS，不透過 openclaw 指令包裝，避免參數被過濾
 CMD ["node", "dist/index.js", "gateway", "run", "--port", "18789", "--allow-unconfigured"]
