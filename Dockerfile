@@ -16,15 +16,18 @@ RUN pnpm install
 # 6. 編譯
 RUN pnpm run build
 
-# 7. 設定環境變數
+# 7. [關鍵新增] 直接建立設定檔 (雙重保險)
+# 這樣就算啟動指令漏了參數，程式也能讀到這個檔
+RUN echo '{"gateway": {"mode": "local"}}' > .openclawrc
+
+# 8. 設定環境變數
 ENV GATEWAY_MODE=local
 ENV PORT=18789
-# [關鍵修正] 改用環境變數來設定監聽所有 IP
 ENV HOST=0.0.0.0
 
-# 8. 開放 Port
+# 9. 開放 Port
 EXPOSE 18789
 
-# 9. 啟動指令
-# [關鍵修正] 移除了 --host 參數，因為它會導致報錯
+# 10. 啟動指令
+# 我們已經有 .openclawrc 了，但參數還是帶著比較保險
 CMD ["node", "dist/index.js", "gateway", "run", "--port", "18789", "--allow-unconfigured"]
