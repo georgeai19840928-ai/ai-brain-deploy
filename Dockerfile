@@ -1,34 +1,27 @@
-# 1. 使用 Node.js 基礎映像檔
-FROM node:20-slim
+# 1. 使用完整的 Node.js 環境 (不使用 slim，避免缺編譯工具)
+FROM node:20
 
-# 2. 安裝基礎工具 (確保有 find 和 bash)
-RUN apt-get update && apt-get install -y findutils bash && rm -rf /var/lib/apt/lists/*
-
-# 3. 設定工作目錄
+# 2. 設定工作目錄
 WORKDIR /app
 
-# 4. 安裝 OpenClaw
-RUN npm install openclaw
+# 3. [關鍵] 直接從 GitHub 下載最新源碼
+# 這樣我們就不受 npm registry 版本或結構的影響
+RUN git clone --depth 1 https://github.com/openclaw/openclaw.git .
 
-# 5. 設定環境變數
+# 4. 安裝依賴
+RUN npm install
+
+# 5. [關鍵] 現場編譯 (Build)
+# 這會產生我們夢寐以求的 dist/ 資料夾
+RUN npm run build
+
+# 6. 設定環境變數
 ENV GATEWAY_MODE=local
 ENV PORT=18789
+
+# 7. 開放 Port
 EXPOSE 18789
 
-# 6. [核心大招] 建立一個「自動導航」啟動腳本
-# 這個腳本會自己去資料夾裡翻找 index.js，找到誰就跑誰
-RUN echo '#!/bin/bash' > run.sh && \
-    echo 'echo "🔍 Scanning for OpenClaw entry point..."' >> run.sh && \
-    # 優先找 dist/index.js
-    echo 'TARGET=$(find node_modules/openclaw -name "index.js" | grep "dist" | head -n 1)' >> run.sh && \
-    # 如果找不到，就找任何一個 index.js
-    echo 'if [ -z "$TARGET" ]; then TARGET=$(find node_modules/openclaw -name "index.js" | head -n 1); fi' >> run.sh && \
-    # 如果還是找不到，列出目錄結構讓我們除錯
-    echo 'if [ -z "$TARGET" ]; then echo "❌ File not found! Listing files:"; ls -R node_modules/openclaw; exit 1; fi' >> run.sh && \
-    echo 'echo "🚀 Found core: $TARGET"' >> run.sh && \
-    # 啟動！
-    echo 'exec node "$TARGET" gateway run --port 18789 --host 0.0.0.0 --allow-unconfigured' >> run.sh && \
-    chmod +x run.sh
-
-# 7. 執行腳本
-CMD ["/bin/bash", "run.sh"]
+# 8. 啟動指令
+# 因為是我們剛剛自己 build 的，檔案一定在 dist/index.js
+CMD ["node", "dist/index.js", "gateway", "run", "--port", "18789", "--host", "0.0.0.0", "--allow-unconfigured"]
